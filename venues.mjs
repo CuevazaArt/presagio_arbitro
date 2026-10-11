@@ -95,3 +95,46 @@ export async function fetchVenue(id) {
 export async function fetchAll() {
   return Promise.all(VENUES.map((v) => fetchVenue(v.id)));
 }
+
+function pairOf(venue, base, quote) {
+  if (venue === "gate") return `${base}_${quote}`;
+  if (venue === "okx" || venue === "kucoin") return `${base}-${quote}`;
+  return `${base}${quote}`;
+}
+
+/** Primer nivel del libro. Si no hay tamaño, la señal no se confirma. */
+export async function fetchTop(venue, base, quote) {
+  const symbol = pairOf(venue, base, quote);
+  let bid = 0;
+  let ask = 0;
+  let bidQty = 0;
+  let askQty = 0;
+  if (venue === "binance") {
+    const d = await getJson(`https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=5`);
+    bid = num(d.bids?.[0]?.[0]); bidQty = num(d.bids?.[0]?.[1]);
+    ask = num(d.asks?.[0]?.[0]); askQty = num(d.asks?.[0]?.[1]);
+  } else if (venue === "gate") {
+    const d = await getJson(`https://api.gateio.ws/api/v4/spot/order_book?currency_pair=${symbol}&limit=1`);
+    bid = num(d.bids?.[0]?.[0]); bidQty = num(d.bids?.[0]?.[1]);
+    ask = num(d.asks?.[0]?.[0]); askQty = num(d.asks?.[0]?.[1]);
+  } else if (venue === "okx") {
+    const d = await getJson(`https://www.okx.com/api/v5/market/books?instId=${symbol}&sz=1`);
+    const book = d.data?.[0] || {};
+    bid = num(book.bids?.[0]?.[0]); bidQty = num(book.bids?.[0]?.[1]);
+    ask = num(book.asks?.[0]?.[0]); askQty = num(book.asks?.[0]?.[1]);
+  } else if (venue === "bybit") {
+    const d = await getJson(`https://api.bybit.com/v5/market/orderbook?category=spot&symbol=${symbol}&limit=1`);
+    bid = num(d.result?.b?.[0]?.[0]); bidQty = num(d.result?.b?.[0]?.[1]);
+    ask = num(d.result?.a?.[0]?.[0]); askQty = num(d.result?.a?.[0]?.[1]);
+  } else if (venue === "kucoin") {
+    const d = await getJson(`https://api.kucoin.com/api/v1/market/orderbook/level1?symbol=${symbol}`);
+    bid = num(d.data?.bestBid); bidQty = num(d.data?.bestBidSize);
+    ask = num(d.data?.bestAsk); askQty = num(d.data?.bestAskSize);
+  }
+  return {
+    bid,
+    ask,
+    bidUsd: bid * bidQty,
+    askUsd: ask * askQty,
+  };
+}

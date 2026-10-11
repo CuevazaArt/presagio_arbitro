@@ -1,0 +1,20 @@
+{
+  "notionalUsd": 100,
+  "confirmReads": 2,
+  "minTopNotionalUsd": 100,
+  "transferCostUsd": 1,
+  "requireBalanceOnBothVenues": true,
+  "balancesQuote": {
+    "binance": 0,
+    "gate": 0,
+    "okx": 0,
+    "bybit": 0,
+    "kucoin": 0
+  },
+  "balancesBase": {},
+  "armUsd": 0.15,
+  "giveUsd": 0.05,
+  "liqUsd": 1,
+  "maxPositions": 5,
+  "maxConfirmsPerCycle": 8
+}

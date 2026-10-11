@@ -34,7 +34,11 @@ No se comparte nada de la operación de Tokyo:
 
 ## Qué hace un ciclo
 
-`npm run cycle` descarga el libro spot de Binance, Gate, OKX, Bybit y KuCoin. Se queda con pares cripto contra USDT o USDC que estén en al menos tres venues. Arma aristas de compra y venta netas de taker. Si el beneficio es positivo, abre hasta cinco posiciones de papel. Cada una queda entre las tres puertas hasta que una se cruza.
+`npm run cycle` descarga el libro spot de Binance, Gate, OKX, Bybit y KuCoin. Se queda con pares cripto contra USDT o USDC que estén en al menos tres venues. Arma aristas de compra y venta. Eso es una señal, no una posición.
+
+Una entrada al registro (`data/exp2/registro.jsonl`) existe solo si pasan las cuatro pruebas de `ajuste.json`: la misma arista sigue en la lectura siguiente, el primer nivel de los dos libros cubre el nocional, el costo de transferencia deja el neto por encima de cero, y hay saldo del quote en el venue de compra y del activo en el venue de venta. Si el saldo está en cero, el canje no se abre. El flotante de una posición confirmada nace en cero: el hueco visto al entrar no se anota como beneficio. El realizado se escribe solo en la salida, cuando se cruza trail, break-even o liquidación.
+
+Los números de `ajuste.json` (nocional, lecturas, tamaño mínimo, costo de transferencia, saldos, arm, give, liquidación) son el artefacto ajustable. No están escondidos en el código.
 
 Todo el ciclo queda en `data/` (no se versiona): `cycle-*.json`, `latest.json` y `libro.jsonl`. La bitácora de un experimento largo es `BITACORA.md`, aparte del libro y del gráfico, y los menciona.
 

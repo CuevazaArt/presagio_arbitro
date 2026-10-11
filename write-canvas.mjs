@@ -1,8 +1,6 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { writeFileSync } from "node:fs";
 
-const CANVAS = join(dirname(fileURLToPath(import.meta.url)), "artefacto", "presagio-ciclo.canvas.tsx");
+const CANVAS = "C:/Users/lexar/.cursor/projects/c-Users-lexar-Desktop-xrpl-trading-bot/canvases/presagio-ciclo.canvas.tsx";
 
 export function writeCanvas(state) {
   const body = `import {
@@ -60,7 +58,7 @@ function Doors() {
   if (!rows.length) {
     return (
       <Text>
-        Este ciclo no abrió posiciones. Ningún canje del universo compartido dejó beneficio nominal después de comisiones.
+        No hay posición confirmada en este ciclo. Una arista de cotización no es una entrada.
       </Text>
     );
   }
@@ -124,21 +122,27 @@ export default function PresagioCiclo() {
       <Text size="small" tone="secondary">
         El nodo es el flotante en USDT. El pulso grande va hacia el break-even si el beneficio todavía no se consolidó. Cruzar una puerta realiza ese flotante. Fuentes públicas: Binance, Gate, OKX, Bybit, KuCoin.
       </Text>
-      <H2>Composición del portafolio</H2>
-      <Row gap={24} align="start">
-        <Stack gap={6}>
-          <H3>Fondos con los que se paga</H3>
-          <PieChart donut size={180} data={tally("buyQuote")} />
+      {STATE.positions.length ? (
+        <Stack gap={8}>
+          <H2>Composición del libro confirmado</H2>
+          <Row gap={24} align="start">
+            <Stack gap={6}>
+              <H3>Fondos con los que se paga</H3>
+              <PieChart donut size={180} data={tally("buyQuote")} />
+            </Stack>
+            <Stack gap={6}>
+              <H3>Activos comprados</H3>
+              <PieChart donut size={180} data={tally("base")} />
+            </Stack>
+            <Stack gap={6}>
+              <H3>Venue donde se compra</H3>
+              <PieChart donut size={180} data={tally("buyVenue")} />
+            </Stack>
+          </Row>
         </Stack>
-        <Stack gap={6}>
-          <H3>Activos comprados</H3>
-          <PieChart donut size={180} data={tally("base")} />
-        </Stack>
-        <Stack gap={6}>
-          <H3>Venue donde se compra</H3>
-          <PieChart donut size={180} data={tally("buyVenue")} />
-        </Stack>
-      </Row>
+      ) : (
+        <Text>No hay posiciones confirmadas. El grafo sigue en señal hasta la segunda lectura, el tamaño y el saldo.</Text>
+      )}
       <H2>Mejores canjes de este ciclo</H2>
       <BarChart
         horizontal
@@ -154,7 +158,6 @@ export default function PresagioCiclo() {
   );
 }
 `;
-  mkdirSync(dirname(CANVAS), { recursive: true });
   writeFileSync(CANVAS, body);
   return CANVAS;
 }

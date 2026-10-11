@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const repo = root;
-const bitacora = join(root, "BITACORA.md");
+const bitacora = join(root, "BITACORA-EXP2.md");
 const HOURS = 4;
 const INTERVAL_MS = 60_000;
 const CANVAS_EVERY_MS = 15 * 60_000;
@@ -24,23 +24,24 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-writeFileSync(bitacora, `# Bitácora Presagio
+writeFileSync(bitacora, `# Bitácora Presagio — experimento 2
 
-Experimento local para descartar el patrón de beneficio visto en una ventana de 29.6 segundos (11 oct 2026, 21:42:14 a 21:42:43 UTC).
+Se descarta el experimento 1: una arista de cotización nacía como posición en beneficio y el trail la anotaba como realizada. Aquí una entrada al registro existe solo si la misma arista sigue en una segunda lectura, el primer nivel cubre el nocional, el costo de transferencia deja el neto en positivo, y hay saldo en los dos venues. Con los saldos de \`ajuste.json\` en cero, el canje no se abre.
+
+Experimento local de 4 horas. La bitácora no es el libro ni el registro ni el gráfico.
 
 - Inicio: ${stamp(started)}
 - Fin previsto: ${stamp(ends)}
-- Ciclo: cada 60 segundos
-- Artefacto (canvas): cada 15 minutos
-- Libro detallado: \`data/libro.jsonl\` (una línea por ciclo, posiciones completas)
-- Ciclos: \`data/cycle-*.json\`
-- Esta bitácora no es el libro ni el gráfico. Los registra.
+- Ajuste: \`presagio/ajuste.json\`
+- Registro de entradas y salidas: \`presagio/data/exp2/registro.jsonl\`
+- Libro de posiciones confirmadas: \`presagio/data/exp2/libro.jsonl\`
+- Ciclos: \`presagio/data/exp2/cycle-*.json\`
 
-Criterio de descarte, al cerrar las 4 horas:
+Criterio de descarte:
 
-- Si el flotante del libro es negativo en más de la mitad de los ciclos, se descarta “el libro se mantiene en positivo”.
-- Si el primer nombre del ranking cambia en más de la mitad de los ciclos respecto al anterior, se descarta “el ranking de arriba persiste”.
-- Si el realizado por puertas es negativo y mayor en valor absoluto que el flotante medio, se descarta “el beneficio se consolida a favor”.
+- Si no hay ninguna entrada confirmada, se descarta que el hueco de cotización sea una operación.
+- Si hay entradas y el realizado de las salidas es negativo y mayor en valor absoluto que el flotante medio, se descarta que el beneficio se consolide a favor.
+- Si el primer nombre de las aristas vistas cambia en más de la mitad de los ciclos, se descarta que el ranking de la señal persista.
 
 `);
 
@@ -60,7 +61,7 @@ while (Date.now() < ends.getTime()) {
   const res = spawnSync(process.execPath, args, { cwd: repo, encoding: "utf8" });
   let latest = null;
   try {
-    latest = JSON.parse(readFileSync(join(root, "data", "latest.json"), "utf8"));
+    latest = JSON.parse(readFileSync(join(root, "data", "exp2", "latest.json"), "utf8"));
   } catch {
     latest = null;
   }
@@ -71,21 +72,25 @@ while (Date.now() < ends.getTime()) {
   const floating = latest?.positions ? Math.round(floatingSum * 1000) / 1000 : "sin dato";
   const edges = latest?.edgeCount ?? "sin dato";
   const open = latest?.positions?.length ?? "sin dato";
-  if (typeof floating === "number" && floating > 0) positive += 1;
+  if (typeof latest?.floatingUsd === "number") {
+    if (latest.floatingUsd > 0) positive += 1;
+  }
   if (prevTop) {
     compared += 1;
     if (prevTop === top) rankSame += 1;
   }
   prevTop = top;
-  const cycleFile = `presagio/data/cycle-${at.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}.json`;
+  const cycleFile = `presagio/data/exp2/cycle-${at.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}.json`;
   const doors = (latest?.positions || [])
     .map((p) => `${p.base} ${p.floating} ${p.preference}`)
     .join("; ");
   appendFileSync(bitacora, `## Ciclo ${n} · ${at}
 
-- Registro: \`${cycleFile.replace("presagio/", "")}\`
-- Libro: \`data/libro.jsonl\` (última línea)
-- Artefacto: ${withCanvas ? "`artefacto/presagio-ciclo.canvas.tsx` actualizado" : "sin tocar en este ciclo"}
+- Ciclo: \`${cycleFile}\`
+- Registro objetivo: \`presagio/data/exp2/registro.jsonl\`
+- Libro: \`presagio/data/exp2/libro.jsonl\`
+- Artefacto: ${withCanvas ? "`canvases/presagio-ciclo.canvas.tsx` actualizado" : "sin tocar en este ciclo"}
+- Vistas netas tras transferencia: ${latest?.vistas ?? "sin dato"}. Segundas lecturas: ${latest?.segundas ?? "sin dato"}. Bloqueadas: ${latest?.bloqueadas ?? "sin dato"} ${latest?.bloqueadasPor ? JSON.stringify(latest.bloqueadasPor) : ""}. Entradas: ${latest?.confirmadas ?? "sin dato"}. Salidas: ${Array.isArray(latest?.events) ? latest.events.length : "sin dato"}
 - Venues: ${(latest?.venues || []).map((v) => `${v.id} ${v.ok ? v.n : "caído"}`).join(" · ") || "sin lectura"}
 - Pares compartidos: ${latest?.shared ?? "sin dato"}. Aristas: ${edges}. Abiertas: ${open}. Cierres de este ciclo: ${Array.isArray(latest?.events) ? latest.events.length : "ver libro"}
 - Flotante del libro: ${floating}. Realizado acumulado: ${latest?.realizedUsd ?? "ver libro"}. Tope: ${top} ${topEdge?.netUsd ?? ""}
@@ -105,7 +110,7 @@ appendFileSync(bitacora, `## Cierre · ${stamp(new Date())}
 - Ciclos: ${n}
 - Flotante positivo: ${positive} de ${n}
 - Tope igual al ciclo previo: ${rankSame} de ${compared}
-- Libro: \`data/libro.jsonl\`
-- Último artefacto: \`artefacto/presagio-ciclo.canvas.tsx\`
+- Libro: \`presagio/data/libro.jsonl\`
+- Último artefacto: \`canvases/presagio-ciclo.canvas.tsx\`
 
 `);

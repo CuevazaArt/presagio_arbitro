@@ -77,3 +77,17 @@ export function bestPerBase(edges) {
   }
   return out;
 }
+
+export function edgeKey(edge) {
+  return [edge.base, edge.buyVenue, edge.buyQuote, edge.sellVenue, edge.sellQuote].join("|");
+}
+
+/** Neto actual de una posición ya abierta, en USD del nocional, antes del costo de transferencia. */
+export function liveNetUsd(quotes, pos, notional) {
+  const buy = quotes.find((q) => q.venue === pos.buyVenue && q.base === pos.base && q.quote === pos.buyQuote);
+  const sell = quotes.find((q) => q.venue === pos.sellVenue && q.base === pos.base && q.quote === pos.sellQuote);
+  if (!buy || !sell || !(buy.ask > 0) || !(sell.bid > 0)) return null;
+  const peg = buy.quote === sell.quote ? 1 : 1 - PEG_BPS / 10_000;
+  const unit = (sell.bid * (1 - FEE[sell.venue]) * peg) / (buy.ask * (1 + FEE[buy.venue])) - 1;
+  return Math.round(unit * notional * 1000) / 1000;
+}
