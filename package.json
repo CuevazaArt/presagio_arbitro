@@ -1,0 +1,14 @@
+{
+  "name": "presagio_arbitro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Arbitraje spot por grafo. Independiente del sleeve Tokyo.",
+  "scripts": {
+    "cycle": "node run-cycle.mjs",
+    "experiment": "node experiment.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
