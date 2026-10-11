@@ -35,7 +35,8 @@ export function floatingOf(pos, quotes) {
 }
 
 export function openConfirmed(edge, now, ajuste) {
-  const qty = ajuste.notionalUsd / edge.ask;
+  const notional = edge.notionalUsd || ajuste.notionalUsd;
+  const qty = notional / edge.ask;
   const cost = edge.ask * qty * (1 + FEE[edge.buyVenue]) + ajuste.transferCostUsd;
   return {
     id: `${edge.base}-${now}`,
@@ -47,7 +48,7 @@ export function openConfirmed(edge, now, ajuste) {
     entryAsk: edge.ask,
     entryBid: edge.bid,
     edgeAlEntrarUsd: edge.netUsd,
-    notionalUsd: ajuste.notionalUsd,
+    notionalUsd: notional,
     qty,
     cost,
     openedAt: now,

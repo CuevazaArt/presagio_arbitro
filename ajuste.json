@@ -2,6 +2,7 @@
   "notionalUsd": 100,
   "confirmReads": 2,
   "minTopNotionalUsd": 100,
+  "minOperableUsd": 10,
   "transferCostUsd": 1,
   "requireBalanceOnBothVenues": true,
   "balancesQuote": {

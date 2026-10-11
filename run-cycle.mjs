@@ -15,13 +15,13 @@ function loadJson(path, fallback) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function saldoOk(edge) {
+function saldoOk(edge, notional) {
   if (!ajuste.requireBalanceOnBothVenues) return true;
   const quote = ajuste.balancesQuote?.[edge.buyVenue] ?? 0;
   const baseKey = `${edge.sellVenue}:${edge.base}`;
   const base = ajuste.balancesBase?.[baseKey] ?? 0;
-  const qty = ajuste.notionalUsd / edge.ask;
-  return quote >= ajuste.notionalUsd && base >= qty;
+  const qty = notional / edge.ask;
+  return quote >= notional && base >= qty;
 }
 
 const books = await fetchAll();
@@ -38,7 +38,7 @@ const curr = new Map();
 for (const edge of ranked) {
   const neto = Math.round((edge.netUsd - transfer) * 1000) / 1000;
   if (neto <= 0) continue;
-  curr.set(edgeKey(edge), { ...edge, netUsd: neto });
+  curr.set(edgeKey(edge), { ...edge, grossUsd: edge.netUsd, netUsd: neto });
 }
 const segundas = [...curr.entries()].filter(([key]) => prevVista.has(key)).map(([, edge]) => edge);
 
@@ -78,15 +78,27 @@ for (const edge of segundas) {
   }
   const askUsd = top.buyTop.askUsd;
   const bidUsd = top.sellTop.bidUsd;
-  if (!(askUsd >= ajuste.minTopNotionalUsd) || !(bidUsd >= ajuste.minTopNotionalUsd)) {
-    bloqueadas.push({ ...edge, razon: "tamano", topAskUsd: askUsd, topBidUsd: bidUsd });
+  const floor = ajuste.minOperableUsd ?? 10;
+  if (!(askUsd > 0) || !(bidUsd > 0)) {
+    bloqueadas.push({ ...edge, razon: "tecnico_tamano", topAskUsd: askUsd, topBidUsd: bidUsd });
     continue;
   }
-  if (!saldoOk(edge)) {
-    bloqueadas.push({ ...edge, razon: "sin_saldo", topAskUsd: askUsd, topBidUsd: bidUsd });
+  const operable = Math.min(ajuste.notionalUsd, askUsd, bidUsd);
+  if (operable < floor) {
+    bloqueadas.push({ ...edge, razon: "tamano_insuficiente", operableUsd: operable, topAskUsd: askUsd, topBidUsd: bidUsd });
     continue;
   }
-  const confirmed = { ...edge, topAskUsd: askUsd, topBidUsd: bidUsd };
+  const gross = (edge.grossUsd ?? edge.netUsd + transfer) * (operable / ajuste.notionalUsd);
+  const net = Math.round((gross - transfer) * 1000) / 1000;
+  if (!(net > 0)) {
+    bloqueadas.push({ ...edge, razon: "neto_insuficiente", operableUsd: operable, netUsd: net });
+    continue;
+  }
+  if (!saldoOk(edge, operable)) {
+    bloqueadas.push({ ...edge, razon: "sin_saldo", operableUsd: operable, topAskUsd: askUsd, topBidUsd: bidUsd });
+    continue;
+  }
+  const confirmed = { ...edge, netUsd: net, notionalUsd: operable, topAskUsd: askUsd, topBidUsd: bidUsd };
   confirmadas.push(confirmed);
   open.push(openConfirmed(confirmed, now, ajuste));
   held.add(edge.base);
@@ -163,17 +175,24 @@ writeFileSync(join(expDir, `cycle-${stamp}.json`), JSON.stringify(record, null, 
 writeFileSync(join(expDir, "latest.json"), JSON.stringify(record, null, 2));
 
 const withCanvas = !process.argv.includes("--no-canvas");
-const canvas = withCanvas ? writeCanvas({
-  at: now,
-  venueLine: books.map((b) => `${b.id} ${b.ok ? b.quotes.length : "caído"}`).join(" · "),
-  shared: keep.size,
-  edgeCount: ranked.length,
-  edges: ranked.slice(0, 8),
-  positions,
-  vistas: curr.size,
-  segundas: segundas.length,
-  bloqueadas: bloqueadas.length,
-}) : null;
+let canvas = null;
+if (withCanvas) {
+  try {
+    canvas = writeCanvas({
+      at: now,
+      venueLine: books.map((b) => `${b.id} ${b.ok ? b.quotes.length : "caído"}`).join(" · "),
+      shared: keep.size,
+      edgeCount: ranked.length,
+      edges: ranked.slice(0, 8),
+      positions,
+      vistas: curr.size,
+      segundas: segundas.length,
+      bloqueadas: bloqueadas.length,
+    });
+  } catch (err) {
+    canvas = "tecnico " + String(err.message || err).slice(0, 120);
+  }
+}
 
 console.log(JSON.stringify({
   at: now,
