@@ -28,7 +28,10 @@ function tight(q) {
  * Canje inmediato: comprar el ask en un venue y vender el bid en otro.
  * Beneficio nominal sobre `notional` USDT, neto de taker y del castigo de estable.
  */
-export function edgesFor(quotes, notional) {
+export function edgesFor(quotes, notional, opts = {}) {
+  const transfer = opts.transferCostUsd ?? 0;
+  const minBps = opts.minProfitBps ?? 0;
+  const minUsd = opts.minOperableUsd ?? 0;
   const byKey = new Map();
   for (const q of quotes) {
     if (!tight(q)) continue;
@@ -49,6 +52,15 @@ export function edgesFor(quotes, notional) {
         const peg = buy.quote === sell.quote ? 1 : 1 - PEG_BPS / 10_000;
         const unit = (sell.bid * (1 - FEE[sell.venue]) * peg) / (buy.ask * (1 + FEE[buy.venue])) - 1;
         if (!(unit > 0) || unit > MAX_EDGE) continue;
+        const askUsd = buy.askQty > 0 ? buy.ask * buy.askQty : 0;
+        const bidUsd = sell.bidQty > 0 ? sell.bid * sell.bidQty : 0;
+        if (!(askUsd > 0) || !(bidUsd > 0)) continue;
+        const operable = Math.min(notional, askUsd, bidUsd);
+        if (operable < minUsd) continue;
+        const gross = unit * operable;
+        const net = gross - transfer;
+        const bps = (net / operable) * 10_000;
+        if (!(net > 0) || bps < minBps) continue;
         edges.push({
           base,
           buyVenue: buy.venue,
@@ -57,8 +69,12 @@ export function edgesFor(quotes, notional) {
           sellQuote: sell.quote,
           ask: buy.ask,
           bid: sell.bid,
-          netUsd: Math.round(unit * notional * 1000) / 1000,
-          netBps: Math.round(unit * 10_000),
+          notionalUsd: Math.round(operable * 1000) / 1000,
+          grossUsd: Math.round(gross * 1000) / 1000,
+          netUsd: Math.round(net * 1000) / 1000,
+          netBps: Math.round(bps),
+          topAskUsd: Math.round(askUsd * 100) / 100,
+          topBidUsd: Math.round(bidUsd * 100) / 100,
         });
       }
     }

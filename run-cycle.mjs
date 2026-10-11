@@ -27,7 +27,11 @@ function saldoOk(edge, notional) {
 const books = await fetchAll();
 const keep = sharedUniverse(books);
 const quotes = books.flatMap((b) => b.quotes.filter((q) => keep.has(`${q.base}:${q.quote}`)));
-const ranked = bestPerBase(edgesFor(quotes, ajuste.notionalUsd));
+const ranked = bestPerBase(edgesFor(quotes, ajuste.notionalUsd, {
+  transferCostUsd: ajuste.transferCostUsd,
+  minProfitBps: ajuste.minProfitBps ?? 0,
+  minOperableUsd: ajuste.minOperableUsd ?? 0,
+}));
 const now = new Date().toISOString();
 const transfer = ajuste.transferCostUsd;
 
@@ -36,9 +40,8 @@ const statePath = join(expDir, "estado.json");
 const prevVista = new Set(loadJson(vistaPath, []));
 const curr = new Map();
 for (const edge of ranked) {
-  const neto = Math.round((edge.netUsd - transfer) * 1000) / 1000;
-  if (neto <= 0) continue;
-  curr.set(edgeKey(edge), { ...edge, grossUsd: edge.netUsd, netUsd: neto });
+  if (!(edge.netUsd > 0)) continue;
+  curr.set(edgeKey(edge), edge);
 }
 const segundas = [...curr.entries()].filter(([key]) => prevVista.has(key)).map(([, edge]) => edge);
 
@@ -88,10 +91,12 @@ for (const edge of segundas) {
     bloqueadas.push({ ...edge, razon: "tamano_insuficiente", operableUsd: operable, topAskUsd: askUsd, topBidUsd: bidUsd });
     continue;
   }
-  const gross = (edge.grossUsd ?? edge.netUsd + transfer) * (operable / ajuste.notionalUsd);
+  const unit = operable > 0 && edge.notionalUsd > 0 ? edge.grossUsd / edge.notionalUsd : 0;
+  const gross = unit * operable;
   const net = Math.round((gross - transfer) * 1000) / 1000;
-  if (!(net > 0)) {
-    bloqueadas.push({ ...edge, razon: "neto_insuficiente", operableUsd: operable, netUsd: net });
+  const bps = operable > 0 ? (net / operable) * 10_000 : 0;
+  if (!(net > 0) || bps < (ajuste.minProfitBps ?? 0)) {
+    bloqueadas.push({ ...edge, razon: "neto_insuficiente", operableUsd: operable, netUsd: net, netBps: Math.round(bps) });
     continue;
   }
   if (!saldoOk(edge, operable)) {

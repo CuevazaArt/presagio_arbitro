@@ -39,12 +39,20 @@ function num(v) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-export function quoteRow(venue, symbol, bid, ask) {
+export function quoteRow(venue, symbol, bid, ask, bidQty, askQty) {
   const pair = splitPair(symbol);
   const b = num(bid);
   const a = num(ask);
   if (!pair || !tradableBase(pair.base) || !(b > 0) || !(a >= b)) return null;
-  return { venue, base: pair.base, quote: pair.quote, bid: b, ask: a };
+  return {
+    venue,
+    base: pair.base,
+    quote: pair.quote,
+    bid: b,
+    ask: a,
+    bidQty: num(bidQty),
+    askQty: num(askQty),
+  };
 }
 
 async function getJson(url) {
@@ -55,7 +63,7 @@ async function getJson(url) {
 
 async function binance() {
   const rows = await getJson("https://api.binance.com/api/v3/ticker/bookTicker");
-  return rows.map((r) => quoteRow("binance", r.symbol, r.bidPrice, r.askPrice)).filter(Boolean);
+  return rows.map((r) => quoteRow("binance", r.symbol, r.bidPrice, r.askPrice, r.bidQty, r.askQty)).filter(Boolean);
 }
 
 async function gate() {
@@ -65,13 +73,13 @@ async function gate() {
 
 async function okx() {
   const body = await getJson("https://www.okx.com/api/v5/market/tickers?instType=SPOT");
-  return (body.data || []).map((r) => quoteRow("okx", r.instId, r.bidPx, r.askPx)).filter(Boolean);
+  return (body.data || []).map((r) => quoteRow("okx", r.instId, r.bidPx, r.askPx, r.bidSz, r.askSz)).filter(Boolean);
 }
 
 async function bybit() {
   const body = await getJson("https://api.bybit.com/v5/market/tickers?category=spot");
   const list = body.result?.list || [];
-  return list.map((r) => quoteRow("bybit", r.symbol, r.bid1Price, r.ask1Price)).filter(Boolean);
+  return list.map((r) => quoteRow("bybit", r.symbol, r.bid1Price, r.ask1Price, r.bid1Size, r.ask1Size)).filter(Boolean);
 }
 
 async function kucoin() {

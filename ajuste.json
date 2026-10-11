@@ -3,6 +3,7 @@
   "confirmReads": 2,
   "minTopNotionalUsd": 100,
   "minOperableUsd": 10,
+  "minProfitBps": 15,
   "transferCostUsd": 1,
   "requireBalanceOnBothVenues": true,
   "balancesQuote": {
